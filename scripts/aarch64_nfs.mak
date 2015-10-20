@@ -2,16 +2,16 @@
 ## NFS VARIANT ## 
 
 CROSS_COMPILE	:= aarch64-linux-gnu-
-build_dir       := $(CURDIR)/build-aarch64
+build_dir       := $(JUNO_HOME)/kbuild
 output_dir	:= $(HOME)/work/opt/tftpboot
-rootfs		:= $(HOME)/work/GITS/buildroot/output/images/rootfs.cpio
+rootfs		:= $(JUNO_HOME)/buildroot/output/images/rootfs.cpio
 rootfsbase	:= $(shell basename $(rootfs))
 config_file     := $(build_dir)/.config
 makejobs	:= $(shell grep '^processor' /proc/cpuinfo | sort -u | wc -l)
 makethreads	:= $(shell dc -e "$(makejobs) 1 + p")
 tftproot	:= /var/lib/tftpboot
 
-serverip := `$(HOME)/work/juno/serverip.sh`
+serverip := `$(JUNO_SCRIPTS)/serverip.sh`
 
 make_options := -f Makefile \
 		-j$(makethreads) -l$(makejobs) \
