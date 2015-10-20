@@ -1,4 +1,4 @@
 #!/bin/bash
 
-make CROSS_COMPILE=arm-linux-gnueabi- omap4_panda_defconfig O=pandaboard
-make -C pandaboard CROSS_COMPILE=arm-linux-gnueabi-
+make vexpress_aemv8a_juno_defconfig O=../u-build
+make -C ../u-build -j 4
