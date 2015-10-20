@@ -1,0 +1,78 @@
+From a3bee6f240ee8f72fc71b8821d9f584131481fad Mon Sep 17 00:00:00 2001
+From: Lina Iyer <lina.iyer@linaro.org>
+Date: Thu, 7 May 2015 17:04:05 -0600
+Subject: [PATCH 02/11] PM / Domains: Add domain idle states to cpu domains
+
+Parse domain idle state definitions for cpu domain providers from DT and
+initialize genpd with idle states.
+
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+---
+ drivers/base/power/cpu_domain.c | 37 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 36 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/base/power/cpu_domain.c b/drivers/base/power/cpu_domain.c
+index 833b3b2..5b64c76 100644
+--- a/drivers/base/power/cpu_domain.c
++++ b/drivers/base/power/cpu_domain.c
+@@ -17,6 +17,8 @@
+ #include <linux/pm_domain.h>
+ #include <linux/pm_runtime.h>
+ 
++#define MAX_CLUSTER_STATES	5
++
+ static struct cpumask cpus_handled;
+ 
+ static void do_cpu(void *unused)
+@@ -133,6 +135,10 @@ int pm_cpu_domain_init(struct generic_pm_domain *genpd, struct device_node *dn)
+ 	int cpu;
+ 	int ret;
+ 	cpumask_var_t tmpmask;
++	int i;
++	struct device_node *idle_node;
++	struct genpd_power_state genpd_states[MAX_CLUSTER_STATES];
++	u64 entry_latency, exit_latency, residency;
+ 
+ 	if (!genpd || !dn)
+ 		return -EINVAL;
+@@ -143,7 +149,36 @@ int pm_cpu_domain_init(struct generic_pm_domain *genpd, struct device_node *dn)
+ 	/* CPU genpds have to operate in IRQ safe mode */
+ 	genpd->flags |= GENPD_FLAG_IRQ_SAFE;
+ 
+-	pm_genpd_init(genpd, NULL, false);
++	for (i = 0; i < MAX_CLUSTER_STATES;) {
++
++		idle_node = of_parse_phandle(dn, "power-domain-idle-states", i);
++		if (!idle_node)
++			break;
++		ret = of_property_read_u64(idle_node, "entry-latency-us",
++					   &entry_latency);
++		if (ret)
++			break;
++		ret = of_property_read_u64(idle_node, "exit-latency-us",
++					   &exit_latency);
++		if (ret)
++			break;
++
++		ret = of_property_read_u64(idle_node, "min-residency-us",
++					   &residency);
++		if (ret)
++			break;
++
++		genpd_states[i].power_off_latency_ns =
++					entry_latency * NSEC_PER_USEC;
++		genpd_states[i].power_on_latency_ns =
++					exit_latency * NSEC_PER_USEC;
++		genpd_states[i].residency_ns = residency * NSEC_PER_USEC;
++		genpd_states[i].name = kstrdup(idle_node->name, GFP_KERNEL);
++		i++;
++	}
++
++	pm_genpd_init(genpd, &cpu_domain_gov, genpd_states, i, false);
++
+ 	ret = of_genpd_add_provider_simple(dn, genpd);
+ 	if (ret)
+ 		return ret;
+-- 
+1.9.1
+

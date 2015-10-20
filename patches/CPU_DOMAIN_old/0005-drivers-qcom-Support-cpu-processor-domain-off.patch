@@ -1,0 +1,193 @@
+From a15ea358c8aa87d0318e3b1eba9ac52aa7b3d758 Mon Sep 17 00:00:00 2001
+From: Lina Iyer <lina.iyer@linaro.org>
+Date: Mon, 2 Mar 2015 15:50:02 -0700
+Subject: [PATCH 05/11] drivers: qcom: Support cpu processor domain off
+
+On APQ8084 and MSM8916 QCOM SoC's, the cpus are powered by a single rail
+controlled by the L2 cache power controller (L2 SAW).
+
+The L2 power domain supplies power to all the cpus and L2, while the
+clocks may or may not be inidividually controlled. It is safe to power
+down the domain when all the CPUs and the L2 are powered down. The
+powering down of the domain is done through the finite state machine on
+the L2 SAW.
+
+The genpd domain provider is the L2 SAW and the domain consumers are
+individual cpu devices.
+
+Active (running or clock gated) cpus do a runtime get on their
+respective SAW devices and when the cpus are powered down the SAW device
+would be runtime_put. The final cpu to do a runtime_put calls the down
+power off callback, which determines the aggregated sleep time of the
+cpus in the cluster. If the sleep time allows for a power saving to be
+achieved by powering down the L2 cache, then the cache is flushed and
+configured to be powered off. The domain is powered on in the hardware
+when the first core to wake powers on. The genpd power on call back just
+ensures that the L2 is back in active state.
+
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+---
+ drivers/soc/qcom/spm.c | 78 ++++++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 73 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/soc/qcom/spm.c b/drivers/soc/qcom/spm.c
+index 07ff24e..5c79078 100644
+--- a/drivers/soc/qcom/spm.c
++++ b/drivers/soc/qcom/spm.c
+@@ -26,11 +26,20 @@
+ #include <linux/cpu_pm.h>
+ #include <linux/qcom_scm.h>
+ #include <linux/delay.h>
++#include <linux/pm.h>
++#include <linux/pm_domain.h>
++#include <linux/hwspinlock.h>
++#include <linux/tick.h>
++#include <linux/hrtimer.h>
++#include <linux/spinlock.h>
+ 
+ #include <asm/cpuidle.h>
+ #include <asm/proc-fns.h>
+ #include <asm/suspend.h>
++#if IS_ENABLED(CONFIG_ARM64)
+ #include <asm/cpu_ops.h>
++#endif
++#include <asm/cacheflush.h>
+ 
+ #define MAX_PMIC_DATA		2
+ #define MAX_PMIC_WAIT		50
+@@ -39,6 +48,9 @@
+ #define SPM_CTL_INDEX		0x7f
+ #define SPM_CTL_INDEX_SHIFT	4
+ #define SPM_CTL_EN		BIT(0)
++#define QCOM_PC_HWLOCK		7
++
++#define MIN_CLUSTER_SLEEP_uS	10000
+ 
+ enum pm_sleep_mode {
+ 	PM_SLEEP_MODE_STBY,
+@@ -180,6 +192,11 @@ static struct spm_driver_data *l2_spm_drv;
+ typedef int (*idle_fn)(int);
+ static DEFINE_PER_CPU(idle_fn*, qcom_idle_ops);
+ 
++static struct hwspinlock *remote_lock;
++static struct generic_pm_domain genpd;
++
++static u32 l2_flush_flag = QCOM_SCM_CPU_PWR_DOWN_L2_ON;
++
+ static DEFINE_SPINLOCK(vdd_lock);
+ 
+ static inline void spm_register_write(struct spm_driver_data *drv,
+@@ -263,7 +280,24 @@ static void spm_set_low_power_mode(struct spm_driver_data *drv,
+ 
+ static int qcom_pm_collapse(unsigned long int unused)
+ {
+-	qcom_scm_cpu_power_down(QCOM_SCM_CPU_PWR_DOWN_L2_ON);
++	/*
++	 * Wait and acquire the hwspin lock to synchronize
++	 * the entry into SCM. The view of the last core in Linux
++	 * should be same for SCM so the l2_flush_flag is correct.
++	 *
++	 * *IMPORTANT*
++	 * 1. SCM unlocks this lock.
++	 * 2. We do not want to call api that would spinlock before
++	 *    acquiring the hwspin lock. It will not be unlocked.
++	 * 3. Every core needs to acquire this lock.
++	 */
++	if (remote_lock)
++		while(__hwspin_trylock(remote_lock, HWLOCK_NOLOCK, NULL));
++
++	if (l2_flush_flag == QCOM_SCM_CPU_PWR_DOWN_L2_OFF)
++		flush_cache_all();
++
++	qcom_scm_cpu_power_down(l2_flush_flag);
+ 
+ 	/*
+ 	 * Returns here only if there was a pending interrupt and we did not
+@@ -278,7 +312,8 @@ static int qcom_cpu_spc(int cpu)
+ 	struct spm_driver_data *drv = per_cpu(cpu_spm_drv, cpu);
+ 
+ 	spm_set_low_power_mode(drv, PM_SLEEP_MODE_SPC);
+-#if IS_ENABLED(CONFIG_ARCH_ARM)
++
++#if IS_ENABLED(CONFIG_ARM)
+ 	ret = cpu_suspend(0, qcom_pm_collapse);
+ #else
+ 	ret = __cpu_suspend(0, qcom_pm_collapse);
+@@ -297,6 +332,7 @@ static int qcom_cpu_spc(int cpu)
+ int qcom_idle_enter(unsigned long index)
+ {
+ 	int cpu = smp_processor_id();
++
+ 	return per_cpu(qcom_idle_ops, cpu)[index](cpu);
+ }
+ 
+@@ -305,6 +341,23 @@ static const struct of_device_id qcom_idle_state_match[] __initconst = {
+ 	{ },
+ };
+ 
++static int pd_power_on(struct generic_pm_domain *domain)
++{
++	l2_flush_flag = QCOM_SCM_CPU_PWR_DOWN_L2_ON;
++	spm_set_low_power_mode(l2_spm_drv, PM_SLEEP_MODE_STBY);
++
++	return 0;
++}
++
++static int pd_power_off(struct generic_pm_domain *domain)
++{
++	printk("domain off\n");
++	spm_set_low_power_mode(l2_spm_drv, PM_SLEEP_MODE_SPC);
++	l2_flush_flag = QCOM_SCM_CPU_PWR_DOWN_L2_OFF;
++
++	return 0;
++}
++
+ int __init qcom_cpuidle_init(struct device_node *cpu_node, u32 cpu)
+ {
+ 	const struct of_device_id *match_id;
+@@ -372,7 +425,7 @@ check_spm:
+ 	return per_cpu(cpu_spm_drv, cpu) ? 0 : -ENXIO;
+ }
+ 
+-#ifdef ARCH_ARM
++#if IS_ENABLED(CONFIG_ARM)
+ static struct cpuidle_ops qcom_cpuidle_ops __initdata = {
+ 	.suspend = qcom_idle_enter,
+ 	.init = qcom_cpuidle_init,
+@@ -445,6 +498,12 @@ static const struct of_device_id spm_match_table[] = {
+ 	{ },
+ };
+ 
++static const struct of_device_id hw_lock_table[] = {
++	{ .compatible = "qcom,apq8084-saw2-v2.1-l2" },
++	{ .compatible = "qcom,msm8916-saw2-v3.0-l2" },
++	{ },
++};
++
+ static int spm_dev_probe(struct platform_device *pdev)
+ {
+ 	struct spm_driver_data *drv;
+@@ -491,9 +550,18 @@ static int spm_dev_probe(struct platform_device *pdev)
+ 	/* Set up Standby as the default low power mode */
+ 	spm_set_low_power_mode(drv, PM_SLEEP_MODE_STBY);
+ 
+-	if (cpu < 0)
++	/* If we are a cache SPM, we have nothing more to do */
++	if (cpu < 0) {
+ 		l2_spm_drv = drv;
+-	else
++		if (!of_match_node(hw_lock_table, pdev->dev.of_node))
++			remote_lock =
++				hwspin_lock_request_specific(QCOM_PC_HWLOCK);
++		genpd.name = kstrdup("qcom-cpu-domain", GFP_KERNEL);
++		genpd.power_on = pd_power_on;
++		genpd.power_off = pd_power_off;
++		pm_cpu_domain_init(&genpd, pdev->dev.of_node);
++
++	} else
+ 		per_cpu(cpu_spm_drv, cpu) = drv;
+ 
+ 	return 0;
+-- 
+1.9.1
+

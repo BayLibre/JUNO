@@ -1,0 +1,123 @@
+From 1206253a155f698c572c632f80e4dcf55ae6b2fc Mon Sep 17 00:00:00 2001
+From: Marc Titinger <mtitinger@baylibre.com>
+Date: Fri, 28 Aug 2015 18:00:44 +0200
+Subject: [PATCH 10/11] omap4: genpd: add CPU domains
+
+Signed-off-by: Marc Titinger <mtitinger@baylibre.com>
+---
+ arch/arm/boot/dts/omap4.dtsi | 24 +++++++++++++++++++++++-
+ arch/arm/mach-omap2/pm44xx.c | 36 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 59 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index f884d6a..ad03270 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -41,13 +41,33 @@
+ 			clock-names = "cpu";
+ 
+ 			clock-latency = <300000>; /* From omap-cpufreq driver */
++			cpu-idle-states = <&CPU_SPC>;
++			power-domains = <&L2>;
+ 		};
+ 		cpu@1 {
+ 			compatible = "arm,cortex-a9";
+ 			device_type = "cpu";
+ 			next-level-cache = <&L2>;
+ 			reg = <0x1>;
+-		};
++			cpu-idle-states = <&CPU_SPC>;
++			power-domains = <&L2>;
++		};
++
++                idle-states {
++                        CPU_SPC: spc {
++                                compatible = "arm,idle-state";
++                                entry-latency-us = <0 150>;
++                                exit-latency-us = <0 200>;
++                                min-residency-us = <0 2000>;
++                        };
++                        CLUSTER_SPC: l2_spc {
++                                compatible = "arm,idle-state";
++                                entry-latency-us = <0 1000>;
++                                exit-latency-us = <0 2000>;
++                                min-residency-us = <0 10000>;
++                        };
++                };
++
+ 	};
+ 
+ 	gic: interrupt-controller@48241000 {
+@@ -64,6 +84,8 @@
+ 		reg = <0x48242000 0x1000>;
+ 		cache-unified;
+ 		cache-level = <2>;
++		#power-domain-cells = <0>;
++		power-domain-idle-states = <&CPU_SPC &CLUSTER_SPC>;		
+ 	};
+ 
+ 	local-timer@48240600 {
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index d697cec..5d4d613 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -24,6 +24,12 @@
+ #include "powerdomain.h"
+ #include "pm.h"
+ 
++
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_device.h>
++#include <linux/pm_domain.h>
++
+ u16 pm44xx_errata;
+ 
+ struct power_state {
+@@ -231,6 +237,22 @@ int __init omap4_pm_init_early(void)
+ 	return 0;
+ }
+ 
++
++static int pd_power_on(struct generic_pm_domain *domain)
++{
++        printk("domain on\n");
++
++        return 0;
++}
++
++static int pd_power_off(struct generic_pm_domain *domain)
++{
++        printk("domain off\n");
++
++        return 0;
++}
++
++
+ /**
+  * omap4_pm_init - Init routine for OMAP4+ devices
+  *
+@@ -290,6 +312,20 @@ int __init omap4_pm_init(void)
+ 	if (cpu_is_omap44xx())
+ 		omap4_idle_init();
+ 
++
++	{
++	struct generic_pm_domain genpd;
++
++	/* Get the L2 cache node */
++	struct device_node *node = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
++
++	genpd.name = kstrdup("omap-cpu-domain", GFP_KERNEL);
++	genpd.power_on = pd_power_on;
++	genpd.power_off = pd_power_off;
++
++	pm_cpu_domain_init(&genpd, node);
++	}
++
+ err2:
+ 	return ret;
+ }
+-- 
+1.9.1
+

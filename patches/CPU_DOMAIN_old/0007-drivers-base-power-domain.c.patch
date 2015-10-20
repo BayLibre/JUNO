@@ -1,0 +1,32 @@
+From 19c579089234981581d517ef208ca5133da6ac43 Mon Sep 17 00:00:00 2001
+From: Lina Iyer <lina.iyer@linaro.org>
+Date: Mon, 18 May 2015 16:08:00 -0600
+Subject: [PATCH 07/11] drivers/base/power/domain.c
+
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+---
+ drivers/base/power/domain.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 9c702ba..57163be 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -552,12 +552,8 @@ static int pm_genpd_runtime_suspend(struct device *dev)
+ 	if (IS_ERR(genpd))
+ 		return -EINVAL;
+ 
+-	/*
+-	 * We can't allow to power off the PM domain if it holds an irq_safe
+-	 * device. That's beacuse we use mutexes to protect data while power
+-	 * off and on the PM domain, thus we can't execute in atomic context.
+-	 */
+-	if (dev->power.irq_safe)
++	/* We can't allow to power off a domain that is also not irq safe. */
++	if (dev->power.irq_safe && !genpd->irq_safe)
+ 		return -EBUSY;
+ 
+ 	stop_ok = genpd->gov ? genpd->gov->stop_ok : NULL;
+-- 
+1.9.1
+

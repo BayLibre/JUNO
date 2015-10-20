@@ -1,0 +1,63 @@
+From e8cfe18a7825189591307c25272ca91330108279 Mon Sep 17 00:00:00 2001
+From: Axel Haslam <ahaslam@baylibre.com>
+Date: Mon, 9 Mar 2015 13:02:36 +0100
+Subject: [PATCH] vexpress64: juno: reserve top 16MB of ram for secure use
+
+U-boot relocaddr is at the top of the ram but since commit
+"740134e6 Juno: Reserve some DDR-DRAM for secure use"
+on the arm-trusted-firmware the top 16MB of ram for the juno
+board are reserved for secure use giving the following
+fault during boot:
+
+"Synchronous Abort" handler, esr 0x96000010
+ELR:     e0003fd0
+LR:      e0003fc8
+x0 : 00000000ff78ef68 x1 : 0000000000000000
+x2 : 00000000e0030000 x3 : 0000000000000019
+x4 : 000000008007fa10 x5 : ffffff80ffffffc8
+x6 : 00000000ffffffc8 x7 : 0000000000000004
+x8 : 0000000000000065 x9 : 0000000000000000
+x10: 000000008007f8f8 x11: 00000000e0024000
+x12: 000000000000000f x13: 0000000000000000
+x14: 0000000000000000 x15: 0000000000000000
+x16: 0000000000000000 x17: 0000000000000000
+x18: 000000008007fdd0 x19: 00000000e0026c90
+x20: 0000000000000000 x21: 00000000e002dccb
+x22: 00000000e002dccb x23: 00000000e002dcd1
+x24: 00000000e002edd0 x25: 0000000000000000
+x26: 0000000000000000 x27: 0000000000000000
+
+To fix this, Prevent uboot from relocating to
+secure addresses by substracting 16MB from the
+total available SDRAM size.
+
+Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+---
+ include/configs/vexpress_aemv8a.h | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/include/configs/vexpress_aemv8a.h b/include/configs/vexpress_aemv8a.h
+index 7a6ac9b..2cbbdef 100644
+--- a/include/configs/vexpress_aemv8a.h
++++ b/include/configs/vexpress_aemv8a.h
+@@ -186,7 +186,16 @@
+ /* Physical Memory Map */
+ #define CONFIG_NR_DRAM_BANKS		1
+ #define PHYS_SDRAM_1			(V2M_BASE)	/* SDRAM Bank #1 */
+-#define PHYS_SDRAM_1_SIZE		0x80000000	/* 2048 MB */
++
++#ifdef CONFIG_TARGET_VEXPRESS64_JUNO
++/* Top 16MB reserved for secure use */
++#define DRAM_SCP_SIZE		0x00200000
++#define DRAM_SEC_SIZE		0x00E00000
++#define PHYS_SDRAM_1_SIZE	0x80000000 - DRAM_SCP_SIZE - DRAM_SEC_SIZE
++#else
++#define PHYS_SDRAM_1_SIZE		0x80000000 - DRAM_SCP_SIZE /* 2048 MB */
++#endif
++
+ #define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM_1
+ 
+ /* Initial environment variables */
+-- 
+2.4.5
+

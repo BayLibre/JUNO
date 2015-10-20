@@ -1,0 +1,43 @@
+From 3014315fd36f9798761ffa9e332f93e9e54dc622 Mon Sep 17 00:00:00 2001
+From: Lina Iyer <lina.iyer@linaro.org>
+Date: Thu, 7 May 2015 16:27:58 -0600
+Subject: [PATCH 04/11] arm64: dts: Add cpu domain definition and idle states
+
+Add domain provider definition to L2 SAW power controller, and each cpu
+as a domain consumer. Add idle states for L2 SAW.
+
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index cdc9d4a..a9e05f6 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -101,6 +101,14 @@
+ 				min-residency-us = <2000>;
+ 				local-timer-stop;
+ 			};
++
++			CLUSTER_SPC: l2_spc {
++				compatible = "qcom,idle-state-spc",
++						"arm,idle-state";
++				entry-latency-us = <1000>;
++				exit-latency-us = <2000>;
++				min-residency-us = <10000>;
++			};
+ 		};
+ 
+ 		L2_0: l2-cache {
+@@ -304,6 +312,7 @@
+ 			compatible = "qcom,msm8916-saw2-v3.0-l2";
+ 			reg = <0xB012000 0x1000>, <0xB009000 0x1000>;
+ 			#power-domain-cells = <0>;
++			power-domain-idle-states = <&CLUSTER_SPC>;
+ 		};
+ 
+ 		tcsr_mutex_regs: syscon@1905000 {
+-- 
+1.9.1
+

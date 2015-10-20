@@ -1,0 +1,31 @@
+From b1e8a39fb5791aa6afc158ecf11ab446544d9fd0 Mon Sep 17 00:00:00 2001
+From: Marc Titinger <mtitinger@baylibre.com>
+Date: Fri, 28 Aug 2015 18:03:24 +0200
+Subject: [PATCH 11/11] PM: domains: make pm_genpd_init also zero
+ prepared_count and attach_dev
+
+those uninitialized fields would lead to errors in genpd_dev_pm_attach.
+
+Signed-off-by: Marc Titinger <mtitinger@baylibre.com>
+---
+ drivers/base/power/domain.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 57163be..29e3d66 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1857,6 +1857,10 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
+ 	atomic_set(&genpd->sd_count, 0);
+ 	genpd->status = is_off ? GPD_STATE_POWER_OFF : GPD_STATE_ACTIVE;
+ 	genpd->device_count = 0;
++
++	genpd->prepared_count = 0;
++    genpd->attach_dev = 0;
++
+ 	genpd->max_off_time_ns = -1;
+ 	genpd->max_off_time_changed = true;
+ 	genpd->domain.ops.runtime_suspend = pm_genpd_runtime_suspend;
+-- 
+1.9.1
+

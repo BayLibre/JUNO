@@ -1,0 +1,86 @@
+From 7626ff2a7f111dd2b8d2d0e5fd6e0685934aa0b9 Mon Sep 17 00:00:00 2001
+From: Lina Iyer <lina.iyer@linaro.org>
+Date: Thu, 7 May 2015 16:44:55 -0600
+Subject: [PATCH 01/11] PM / Domains: Add cpu-domain governor
+
+CPU domain governor allows a domain to enter the idle state that
+satisfies the residency requirement of the domain idle state.
+
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+---
+ drivers/base/power/domain_governor.c | 42 ++++++++++++++++++++++++++++++++++++
+ include/linux/pm_domain.h            |  1 +
+ 2 files changed, 43 insertions(+)
+
+diff --git a/drivers/base/power/domain_governor.c b/drivers/base/power/domain_governor.c
+index 8139c01..6c1f15a 100644
+--- a/drivers/base/power/domain_governor.c
++++ b/drivers/base/power/domain_governor.c
+@@ -10,6 +10,7 @@
+ #include <linux/pm_domain.h>
+ #include <linux/pm_qos.h>
+ #include <linux/hrtimer.h>
++#include <linux/tick.h>
+ 
+ static int dev_update_qos_constraint(struct device *dev, void *data)
+ {
+@@ -258,3 +259,44 @@ struct dev_power_governor pm_domain_always_on_gov = {
+ 	.power_down_ok = always_on_power_down_ok,
+ 	.stop_ok = default_stop_ok,
+ };
++
++static bool cpu_domain_power_off(struct dev_pm_domain *pd)
++{
++	struct generic_pm_domain *genpd = pd_to_genpd(pd);
++	u64 sleeptime, time_for_state;
++	int idx = -1;
++	int i;
++	struct pm_domain_data *pdd;
++	struct cpumask mask;
++
++	list_for_each_entry(pdd, &genpd->dev_list, list_node)
++		cpumask_set_cpu(pdd->dev->id, &mask);
++
++	cpumask_and(&mask, &mask, cpu_online_mask);
++
++	sleeptime = tick_get_time_to_next_wakeup(&mask);
++
++	/* Only power down the cluster/L2 when we can sleep for a while */
++	for (i = 0; i < genpd->state_count; i++) {
++		time_for_state = (genpd->states[i].residency_ns +
++				genpd->states[i].power_on_latency_ns +
++				genpd->states[i].power_off_latency_ns);
++		do_div(time_for_state, NSEC_PER_USEC);
++		if (sleeptime > time_for_state)
++			idx = i;
++	}
++
++	genpd->state_idx = idx;
++
++	return idx != -1;
++}
++
++static bool cpu_power_off(struct device *dev)
++{
++	return true;
++}
++
++struct dev_power_governor cpu_domain_gov = {
++	.power_down_ok = cpu_domain_power_off,
++	.stop_ok = cpu_power_off,
++};
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 7a9db20..8bde994 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -169,6 +169,7 @@ extern void pm_genpd_poweroff_unused(void);
+ 
+ extern struct dev_power_governor simple_qos_governor;
+ extern struct dev_power_governor pm_domain_always_on_gov;
++extern struct dev_power_governor cpu_domain_gov;
+ #else
+ 
+ static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
+-- 
+1.9.1
+

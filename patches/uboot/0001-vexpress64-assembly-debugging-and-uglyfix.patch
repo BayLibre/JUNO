@@ -1,0 +1,178 @@
+From e37c84f41901ce3f87f29085a6bb2113c8dae588 Mon Sep 17 00:00:00 2001
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Mon, 15 Dec 2014 10:56:40 +0100
+Subject: [PATCH] vexpress64: assembly debugging and uglyfix
+
+Do not apply.
+
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/cpu/armv8/start.S | 100 +++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/lib/gic_64.S      |  14 +++++++
+ 2 files changed, 114 insertions(+)
+
+diff --git a/arch/arm/cpu/armv8/start.S b/arch/arm/cpu/armv8/start.S
+index 4b11aa4f2227..4d3e47d57818 100644
+--- a/arch/arm/cpu/armv8/start.S
++++ b/arch/arm/cpu/armv8/start.S
+@@ -43,11 +43,107 @@ _bss_start_ofs:
+ _bss_end_ofs:
+ 	.quad	__bss_end - _start
+ 
++        .macro _mov_imm16 _reg, _val, _shift
++                .if (\_val >> \_shift) & 0xffff
++                        .if (\_val & (1 << \_shift - 1))
++                                movk    \_reg, (\_val >> \_shift) & 0xffff, LSL \_shift
++                        .else
++                                mov     \_reg, \_val & (0xffff << \_shift)
++                        .endif
++                .endif
++        .endm
++
++        .macro mov_imm _reg, _val
++                .if (\_val) == 0
++                        mov     \_reg, #0
++                .else
++                        _mov_imm16      \_reg, (\_val), 0
++                        _mov_imm16      \_reg, (\_val), 16
++                        _mov_imm16      \_reg, (\_val), 32
++                        _mov_imm16      \_reg, (\_val), 48
++                .endif
++        .endm
++
++#ifdef CONFIG_TARGET_VEXPRESS64_BASE_FVP
++#define uartbase 0x1c090000 /* FPGA UART0 */
++#define uartclk  24000000
++#endif
++//#define uartbase 0x1c0a0000 /* FPGA UART1 */
++//#define uartclk  24000000
++//#define uartbase 0x1c0b0000 /* FPGA UART2 */
++//#define uartclk  24000000
++//#define uartbase 0x1c0c0000 /* FPGA UART3 */
++//#define uartclk  24000000
++#ifdef CONFIG_TARGET_VEXPRESS64_JUNO
++#define uartbase 0x7ff80000 /* SoC UART0 */
++#define uartclk 7273800
++#endif
++//#define uartclk  100000000?
++//#define uartbase 0x7ff70000 /* SoC UART 1 */
++//#define uartclk 7273800
++//#define uartclk 24000000
++
++init_pl011:
++	mov_imm x3, uartbase
++	mov_imm w1, uartclk
++	mov_imm w2, 115200
++	lsl	w1, w1, #2
++	udiv	w2, w1, w2
++	lsr	w1, w2, #6
++	str	w1, [x3, #0x24]
++	and	w1, w2, #0x3f
++	str	w1, [x3, #0x28]
++	mov	w1, #(1 << 4 | 3 << 5)
++	str	w1, [x3, #0x2c]
++	str	wzr, [x3, #0x004]
++	mov	w1, #(1 << 9 | 1 << 8 | 1 << 0)
++	str	w1, [x3, #0x30]
++	ret
++
++ENTRY(printascii)
++	mov_imm x3, uartbase
++1:	ldrb	w0, [x2], #1
++	cbz	w0, 4f
++2:	ldr	w1, [x3, #0x18]
++	tbnz 	w1, #5, 2b
++	str	w0, [x3, #0x00]
++3:	ldr	w1, [x3, #0x18]
++	tbnz	w1, #3, 3b
++	b	1b
++4:	ret
++ENDPROC(printascii)
++
++/* END TEST */
++
++reset_str:
++	.asciz "reset\r\n"
++lowlevel_str:
++	.asciz "lowlevel init\r\n"
++master_str:
++	.asciz "MASTER CPU\r\n"
++slave_str:
++	.asciz "SLAVE CPU\r\n"
++gic1master_str:
++	.asciz "GIC 1 master CPU init\r\n"
++gic1slave_str:
++	.asciz "GIC 1 slave CPU init\r\n"
++gic2_str:
++	.asciz "GIC 2 init\r\n"
++slave_wait_str:
++	.asciz "SLAVE wait for master CPU\r\n"
++main_str:
++	.asciz "jump to _main\r\n"
++
++	.align 3
++
+ reset:
+ 	/*
+ 	 * Could be EL3/EL2/EL1, Initial State:
+ 	 * Little Endian, MMU Disabled, i/dCache Disabled
+ 	 */
++	bl	init_pl011
++	adr	x2, reset_str
++	bl	printascii
+ 	adr	x0, vectors
+ 	switch_el x1, 3f, 2f, 1f
+ 3:	msr	vbar_el3, x0
+@@ -105,6 +201,10 @@ WEAK(lowlevel_init)
+ 	ldr	x0, =GICD_BASE
+ 	bl	gic_init_secure
+ 1:
++	mov	x28, x0
++	adr	x2, gic2_str
++	bl	printascii
++	mov	x0, x28
+ #if defined(CONFIG_GICV3)
+ 	ldr	x0, =GICR_BASE
+ 	bl	gic_init_secure_percpu
+diff --git a/arch/arm/lib/gic_64.S b/arch/arm/lib/gic_64.S
+index a3e18f7713e5..1718644f03c0 100644
+--- a/arch/arm/lib/gic_64.S
++++ b/arch/arm/lib/gic_64.S
+@@ -13,6 +13,12 @@
+ #include <asm/gic.h>
+ #include <asm/macro.h>
+ 
++sec_str:
++	.asciz "GIC sec init\r\n"
++sec_cpu_str:
++	.asciz "GIC CPU sec init\r\n"
++
++	.align 3
+ 
+ /*************************************************************************
+  *
+@@ -26,6 +32,12 @@ ENTRY(gic_init_secure)
+ 	 * Initialize Distributor
+ 	 * x0: Distributor Base
+ 	 */
++/*
++	mov	x28, x0
++	adr	x2, sec_str
++	bl	printascii
++	mov	x0, x28
++*/
+ #if defined(CONFIG_GICV3)
+ 	mov	w9, #0x37		/* EnableGrp0 | EnableGrp1NS */
+ 					/* EnableGrp1S | ARE_S | ARE_NS */
+@@ -67,6 +79,8 @@ ENDPROC(gic_init_secure)
+  *
+  *************************************************************************/
+ ENTRY(gic_init_secure_percpu)
++	adr	x2, sec_cpu_str
++	bl	printascii
+ #if defined(CONFIG_GICV3)
+ 	/*
+ 	 * Initialize ReDistributor
+-- 
+2.4.3
+
