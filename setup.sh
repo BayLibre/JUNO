@@ -26,3 +26,12 @@ export INSTALL_MOD_PATH=$JUNO_HOME/buildroot/output/images
 alias bd="make -C $JUNO_HOME/kbuild/ -f $JUNO_SCRIPTS/aarch64_nfs.mak build"
 alias kprep="mkdir -p $JUNO_KBUILD && make -C $JUNO_HOME/linux -f $JUNO_SCRIPTS/aarch64_nfs.mak config"
 
+
+if [  -f ~/.gitconfig_BAYLIBRE  ]
+then
+	echo "setting RENESAS git ID"
+	cp ~/.gitconfig_RENESAS ~/.gitconfig
+	cp ~/.vimrc_JUNO ~/.vimrc
+else
+	echo "baylibre gitconfig missing?"
+fi
