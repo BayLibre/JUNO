@@ -1,5 +1,6 @@
+.repo
+arm-trusted-firmware
 buildroot
 linux
-kbuild
+build
 u-boot
-u-build
