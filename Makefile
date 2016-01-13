@@ -7,10 +7,6 @@ ifndef JUNO_HOME
  $(error you need to source juno-setup, or define the matching variables)
 endif
 
-export KERNEL_BUILD=$(JUNO_HOME)/build/linux
-export KERNEL_SRC=$(JUNO_HOME)/linux
-export UBOOT_SRC=$(JUNO_HOME)/u-boot
-
 all: kernel u-boot rootfs BL33
 	-@cat .log
 
@@ -101,13 +97,14 @@ distclean: clean
 	-@rm -f patches/.applied
 	-@rm -rf $(KERNEL_BUILD)
 	make -C $(KERNEL_SRC) mrproper
+	make -C arm-trusted-firmware realclean
 	make -C buildroot clean
 	make -C u-boot mrproper
 	sudo rm -rf rootfs rootfs.tar.xz
 	echo "" > .log
 
 clean:
-	-@make -C $(KERNEL_BUILD) clean
+	-@rm -rf $(KERNEL_BUILD)
 	-@rm -rf $(UBOOT_BUILD)
 	-@sudo rm $(JUNO_HOME)/buildroot/output/images/rootfs.tar
 	-@rm $(INSTALL_MOD_PATH)/.rootfs

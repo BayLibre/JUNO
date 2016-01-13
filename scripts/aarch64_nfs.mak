@@ -3,7 +3,7 @@
 
 CROSS_COMPILE	:= aarch64-linux-gnu-
 build_dir       := $(KERNEL_BUILD)
-output_dir	:= $(JUNO_HOME)/output
+output_dir	:= $(JUNO_HOME)/build
 rootfs		:= $(INSTALL_MOD_PATH)/rootfs.cpio
 rootfsbase	:= $(shell basename $(rootfs))
 config_file     := $(build_dir)/.config
@@ -11,7 +11,7 @@ makejobs	:= $(shell grep '^processor' /proc/cpuinfo | sort -u | wc -l)
 makethreads	:= $(shell dc -e "$(makejobs) 1 + p")
 tftproot	:= /var/lib/tftpboot
 
-serverip := `$(JUNO_SCRIPTS)/serverip.sh`
+serverip := $(SERVERIP)
 
 make_options := -f Makefile \
 		-j$(makethreads) -l$(makejobs) \

@@ -6,6 +6,10 @@ export JUNO_HOME=$HOME/JUNO
 export JUNO_SCRIPTS=$JUNO_HOME/scripts
 export JUNO_BINS=$JUNO_HOME/bins
 export UBOOT_BUILD=$JUNO_HOME/build/u-boot
+export KERNEL_BUILD=$JUNO_HOME/build/kernel
+
+export KERNEL_SRC=$JUNO_HOME/linux
+export UBOOT_SRC=$JUNO_HOME/u-boot
 
 #aarch64 uboot tools
 export PATH=$UBOOT_BUILD/tools/:$PATH
