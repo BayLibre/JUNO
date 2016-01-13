@@ -1,0 +1,22 @@
+#!/bin/bash
+
+if [ -z "$JUNO_HOME" ]
+then
+	echo "JUNO_HOME not defined"
+	exit 1
+fi
+
+set -x 
+
+#juno_drive=`lsblk -nl |   grep JUNO | sed -re 's/^sd([0-z]+)\s+.*/sd\1/'`
+
+juno_path=`lsblk | grep JUNO | sed -re 's/.*\s+(.*JUNO$)/\1/'`
+
+if [ ! -d "$juno_path/SOFTWARE" ]
+then
+ echo "Cannot access JUNO/SOFTWARE"
+ exit 2
+fi
+
+cp $JUNO_HOME/arm-trusted-firmware/build/juno/debug/fip.bin $juno_path/SOFTWARE/fip.bin
+cp $JUNO_HOME/arm-trusted-firmware/build/juno/debug/bl1.bin $juno_path/SOFTWARE/bl1.bin

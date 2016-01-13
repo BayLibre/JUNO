@@ -2,9 +2,9 @@
 ## NFS VARIANT ## 
 
 CROSS_COMPILE	:= aarch64-linux-gnu-
-build_dir       := $(JUNO_HOME)/kbuild
-output_dir	:= $(HOME)/work/opt/tftpboot
-rootfs		:= $(JUNO_HOME)/buildroot/output/images/rootfs.cpio
+build_dir       := $(KERNEL_BUILD)
+output_dir	:= $(JUNO_HOME)/output
+rootfs		:= $(INSTALL_MOD_PATH)/rootfs.cpio
 rootfsbase	:= $(shell basename $(rootfs))
 config_file     := $(build_dir)/.config
 makejobs	:= $(shell grep '^processor' /proc/cpuinfo | sort -u | wc -l)
