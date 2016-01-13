@@ -9,6 +9,7 @@ endif
 
 export KERNEL_BUILD=$(JUNO_HOME)/build/linux
 export KERNEL_SRC=$(JUNO_HOME)/linux
+export UBOOT_SRC=$(JUNO_HOME)/u-boot
 
 all: kernel u-boot rootfs BL33
 	-@cat .log
@@ -79,24 +80,16 @@ BL33: u-boot
 	$(JUNO_SCRIPTS)/deploy-atf
 
 ##
-# SDCARD and BOOTLOADER contents
-##
-
-sdcard: u-boot/MLO $(INSTALL_MOD_PATH)/.rootfs $(KERNEL_BUILD)/arch/arm/boot/zImage
-	@make -C sdcard all
-	-@cat .log
-
-##
 # U_BOOT
 ##
 
-u-boot: $(UBOOT_BUILD)/MLO $(UBOOT_BUILD)/u-boot.bin
+u-boot: $(UBOOT_BUILD)/u-boot.bin
 
-$(UBOOT_BUILD)/MLO: $(UBOOT_BUILD)/.config
-	@mkdir -p $(KERNEL_BUILD)
+$(UBOOT_BUILD)/u-boot.bin: $(UBOOT_BUILD)/.config
+	@mkdir -p $(UBOOT_BUILD)
 	make -C $(UBOOT_BUILD) ARCH=arm -j4
 
-$(UBOOT_BUILD)/.config: patches/.applied
+$(UBOOT_BUILD)/.config:
 	make -C $(UBOOT_SRC) O=$(UBOOT_BUILD) ARCH=arm64 vexpress_aemv8a_juno_defconfig
 
 ##
