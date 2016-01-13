@@ -18,7 +18,10 @@ export BL30=$JUNO_BINS/atf/bl30.bin DEBUG=1
 export PLAT=juno
 export DEBUG=1
 export LOG_LEVEL=50
-export INSTALL_MOD_PATH=$JUNO_HOME/buildroot/output/images
+
+export INSTALL_MOD_PATH=$JUNO_HOME/rootfs
+export SERVERIP=`hostname -I`
+export BOARDIP="192.168.1.100"
 
 if [  -f ~/.gitconfig_BAYLIBRE  ]
 then

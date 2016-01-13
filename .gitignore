@@ -4,3 +4,4 @@ buildroot
 linux
 build
 u-boot
+rootfs

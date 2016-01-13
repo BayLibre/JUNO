@@ -50,7 +50,7 @@ $(JUNO_HOME)/buildroot/.config:
 # create rootfs.tar.xz
 #
 
-rootfs: rootfs.tar.xz fix-nfs
+rootfs: rootfs.tar.xz
 
 rootfs.tar.xz: $(INSTALL_MOD_PATH)/.rootfs
 	xz -kc $(JUNO_HOME)/buildroot/output/images/rootfs.tar > rootfs.tar.xz
@@ -58,16 +58,11 @@ rootfs.tar.xz: $(INSTALL_MOD_PATH)/.rootfs
 $(INSTALL_MOD_PATH)/.rootfs: $(JUNO_HOME)/buildroot/output/images/rootfs.tar
 	@mkdir -p $(INSTALL_MOD_PATH)
 	sudo tar xv -C $(INSTALL_MOD_PATH) -f $(JUNO_HOME)/buildroot/output/images/rootfs.tar
-	sudo chown ${USER}:${USER} rootfs
+	sudo chown ${USER}:${USER}  $(INSTALL_MOD_PATH)
 	@date > $(INSTALL_MOD_PATH)/.rootfs
 
 $(JUNO_HOME)/buildroot/output/images/rootfs.tar: $(JUNO_HOME)/buildroot/.config
 	make -C $(JUNO_HOME)/buildroot -j 5
-
-fix-nfs: $(INSTALL_MOD_PATH)/.rootfs
-	cat sdcard/uenv/uEnv-nfs.tmpl | sed 's#INSTALL_MOD_PATH#'"${INSTALL_MOD_PATH}"'#' >  sdcard/uenv/uEnv-nfs.txt
-	sed 's#SERVERIP#'"${SERVERIP}"'#' -i  sdcard/uenv/uEnv-nfs.txt
-	sed 's#BOARDIP#'"${BOARDIP}"'#' -i  sdcard/uenv/uEnv-nfs.txt
 
 ##
 # ARM Trusted Firmware
@@ -90,7 +85,13 @@ $(UBOOT_BUILD)/u-boot.bin: $(UBOOT_BUILD)/.config
 	make -C $(UBOOT_BUILD) ARCH=arm -j4
 
 $(UBOOT_BUILD)/.config:
-	make -C $(UBOOT_SRC) O=$(UBOOT_BUILD) ARCH=arm64 vexpress_aemv8a_juno_defconfig
+	@make -C $(UBOOT_SRC) O=$(UBOOT_BUILD) ARCH=arm64 vexpress_aemv8a_juno_defconfig
+	@echo "fix u-boot config for NFS boot"
+	@cd $(UBOOT_SRC) && git checkout include/configs/vexpress_aemv8a.h -f
+	@cd $(UBOOT_SRC) && patch -p1 < $(JUNO_HOME)/uenv/u-boot-vexpress_aemv8a_h.patch
+	@sed 's#INSTALL_MOD_PATH#'"${INSTALL_MOD_PATH}"'#' -i $(UBOOT_SRC)/include/configs/vexpress_aemv8a.h
+	@sed 's#SERVERIP#'"${SERVERIP}"'#' -i  $(UBOOT_SRC)/include/configs/vexpress_aemv8a.h
+	@sed 's#BOARDIP#'"${BOARDIP}"'#' -i  $(UBOOT_SRC)/include/configs/vexpress_aemv8a.h
 
 ##
 # cleanup
