@@ -83,8 +83,11 @@ $(UBOOT_BUILD)/u-boot.bin: $(UBOOT_BUILD)/.config
 $(UBOOT_BUILD)/.config:
 	@make -C $(UBOOT_SRC) O=$(UBOOT_BUILD) ARCH=arm64 vexpress_aemv8a_juno_defconfig
 	@echo "fix u-boot config for NFS boot"
+	#
 	@cd $(UBOOT_SRC) && git checkout include/configs/vexpress_aemv8a.h -f
-	@cd $(UBOOT_SRC) && patch -p1 < $(JUNO_HOME)/uenv/u-boot-vexpress_aemv8a_h.patch
+#	@cd $(UBOOT_SRC) && git apply -3 --ignore-whitespace --reject 
+	@cd $(UBOOT_SRC) && patch -p1 < $(JUNO_HOME)/uenv/0001-hack-juno-configs-to-use-with-nfs.patch
+	#
 	@sed 's#INSTALL_MOD_PATH#'"${INSTALL_MOD_PATH}"'#' -i $(UBOOT_SRC)/include/configs/vexpress_aemv8a.h
 	@sed 's#SERVERIP#'"${SERVERIP}"'#' -i  $(UBOOT_SRC)/include/configs/vexpress_aemv8a.h
 	@sed 's#BOARDIP#'"${BOARDIP}"'#' -i  $(UBOOT_SRC)/include/configs/vexpress_aemv8a.h
