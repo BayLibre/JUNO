@@ -85,7 +85,6 @@ $(UBOOT_BUILD)/.config:
 	@echo "fix u-boot config for NFS boot"
 	#
 	@cd $(UBOOT_SRC) && git checkout include/configs/vexpress_aemv8a.h -f
-#	@cd $(UBOOT_SRC) && git apply -3 --ignore-whitespace --reject 
 	@cd $(UBOOT_SRC) && patch -p1 < $(JUNO_HOME)/uenv/0001-hack-juno-configs-to-use-with-nfs.patch
 	#
 	@sed 's#INSTALL_MOD_PATH#'"${INSTALL_MOD_PATH}"'#' -i $(UBOOT_SRC)/include/configs/vexpress_aemv8a.h
@@ -112,25 +111,3 @@ clean:
 	-@sudo rm $(JUNO_HOME)/buildroot/output/images/rootfs.tar
 	-@rm $(INSTALL_MOD_PATH)/.rootfs
 
-
-help:
-	@echo "Source acme-setup first, after revising the various variables and pathes"
-	@echo "If you wish to experiment with IIO, you may export JUNO_IIO=1 so that"
-	@echo "the makefile automates the right setup for buildroot and kernel"
-	@echo
-	@echo " == Make Targets == "
-	@echo
-	@echo "all			build everything, except the sdcard contents"
-	@echo
-	@echo "kernel, menuconfig	configure and build the kernel, or menuconfig"
-	@echo "u-boot			build u-boot"
-	@echo "rootfs			create a bootable rootfs"
-	@echo
-	@echo "clean			clean the kernel and uboot"
-	@echo "distclean		flush all the build, including buildroot"
-	@echo
-	@echo " == Building the SDCard == "
-	@echo
-	@echo "sdcard			create the sdcard contents, please use with care."
-	@echo
-	make -C sdcard help
