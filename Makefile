@@ -66,7 +66,7 @@ $(JUNO_HOME)/buildroot/output/images/rootfs.tar: $(JUNO_HOME)/buildroot/.config
 
 BL33: u-boot
 	make -C $(JUNO_HOME)/arm-trusted-firmware \
-	BL33=$(UBOOT_BUILD)/u-boot.bin DEBUG=1 PLAT=juno LOG_LEVEL=50 \
+	BL33=$(UBOOT_BUILD)/u-boot.bin PLAT=juno LOG_LEVEL=50 \
 	BL30=$(JUNO_BINS)/atf/bl30.bin all fip
 	$(JUNO_SCRIPTS)/deploy-atf
 

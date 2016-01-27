@@ -25,17 +25,6 @@ help:
 	@echo "make config - configure for aarch64"
 	@echo "make build - build the kernel with initramfs"
 
-.PHONY: have-rootfs
-have-rootfs:
-	@if [ ! -f $(rootfs) ] ; then \
-	     echo "ERROR: no rootfs at $(rootfs)" ; \
-	     echo "This is needed to boot the system." ; \
-	     echo "ABORTING." ; \
-	     exit 1 ; \
-	else \
-	     echo "Rootfs available at $(rootfs)" ; \
-	fi
-
 .PHONY: have-crosscompiler
 have-crosscompiler:
 	@echo -n "Check that $(CROSS_COMPILE)gcc is available..."
@@ -57,16 +46,7 @@ config-base: FORCE
 	--enable MTD_AFS_PARTS \
 	--enable DEBUG_FS
 
-config-initramfs: have-rootfs config-base FORCE
-	@cp $(rootfs) $(build_dir)/$(rootfsbase)
-	# Configure in the initramfs
-	$(CURDIR)/scripts/config --file $(config_file) \
-	--enable BLK_DEV_INITRD \
-	--set-str INITRAMFS_SOURCE $(rootfsbase) \
-	--enable RD_GZIP \
-	--enable INITRAMFS_COMPRESSION_GZIP
-
-config-nfs: have-rootfs config-base FORCE
+config-nfs: config-base FORCE
 	@cp $(rootfs) $(build_dir)/$(rootfsbase)
 	$(CURDIR)/scripts/config --file $(config_file) \
 	--enable ROOT_NFS \

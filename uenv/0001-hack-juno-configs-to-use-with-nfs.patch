@@ -1,18 +1,18 @@
-From 149415261b312edf291c27fc97a7dc384bd09a67 Mon Sep 17 00:00:00 2001
+From 9d2600985fae2ae56d954488049d0886cc987637 Mon Sep 17 00:00:00 2001
 From: Marc Titinger <marc.titinger+renesas@baylibre.com>
-Date: Thu, 14 Jan 2016 10:11:57 +0100
-Subject: [PATCH] hack juno configs to use with nfs
+Date: Wed, 27 Jan 2016 18:31:03 +0100
+Subject: [PATCH] patch u-boot to subst for nfs
 
 Signed-off-by: Marc Titinger <marc.titinger+renesas@baylibre.com>
 ---
- include/configs/vexpress_aemv8a.h | 21 +++++++++++++++++++--
- 1 file changed, 19 insertions(+), 2 deletions(-)
+ include/configs/vexpress_aemv8a.h | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
 diff --git a/include/configs/vexpress_aemv8a.h b/include/configs/vexpress_aemv8a.h
-index 814934a..12f25b4 100644
+index 814934a..9e8975a 100644
 --- a/include/configs/vexpress_aemv8a.h
 +++ b/include/configs/vexpress_aemv8a.h
-@@ -197,9 +197,13 @@
+@@ -197,8 +197,14 @@
  				"fdt_addr=0x83000000\0" \
  				"fdt_high=0xffffffffffffffff\0" \
  				"initrd_high=0xffffffffffffffff\0" \
@@ -22,15 +22,16 @@ index 814934a..12f25b4 100644
 +				"ipaddr=BOARDIP\0"
  
  /* Assume we boot with root on the first partition of a USB stick */
--#define CONFIG_BOOTARGS		"console=ttyAMA0,115200n8 " \
-+//#define CONFIG_BOOTARGS		"console=ttyAMA0,115200n8 " \
++#if 0
++
+ #define CONFIG_BOOTARGS		"console=ttyAMA0,115200n8 " \
  				"root=/dev/sda2 rw " \
  				"rootwait "\
- 				"earlyprintk=pl011,0x7ff80000 debug "\
-@@ -207,8 +211,17 @@
+@@ -207,7 +213,19 @@
  				"androidboot.hardware=juno "\
  				"loglevel=9"
  
++#endif
 +#define CONFIG_BOOTARGS		"console=ttyAMA0,115200n8 " \
 +				"earlyprintk=pl011,0x7ff80000 debug " \
 +				"loglevel=9 " \
@@ -41,15 +42,16 @@ index 814934a..12f25b4 100644
 +				"nfsrootdebug "
 +
  /* Copy the kernel and FDT to DRAM memory and boot */
--#define CONFIG_BOOTCOMMAND	"afs load ${kernel_name} ${kernel_addr} ; " \
-+//#define CONFIG_BOOTCOMMAND	"afs load ${kernel_name} ${kernel_addr} ; " \
++#if 0
++
+ #define CONFIG_BOOTCOMMAND	"afs load ${kernel_name} ${kernel_addr} ; " \
  				"if test $? -eq 1; then "\
  				"  echo Loading ${kernel_alt_name} instead of "\
- 				"${kernel_name}; "\
-@@ -228,6 +241,10 @@
+@@ -228,6 +246,11 @@
  				"fi ; " \
  				"booti ${kernel_addr} ${initrd_param} ${fdt_addr}"
  
++#endif
 +#define CONFIG_BOOTCOMMAND	"tftpboot 0x80000000 Image ; "\
 +				"tftpboot 0x83000000 juno.dtb; "\
 +				"booti 0x80000000 - 0x83000000"
@@ -58,5 +60,5 @@ index 814934a..12f25b4 100644
  
  #elif CONFIG_TARGET_VEXPRESS64_BASE_FVP
 -- 
-2.1.4
+2.5.0
 
