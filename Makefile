@@ -16,7 +16,7 @@ all: kernel u-boot rootfs BL33
 
 $(KERNEL_BUILD)/arch/arm/boot/zImage: kernel
 
-kernel: $(KERNEL_BUILD)/.config rootfs
+kernel: $(KERNEL_BUILD)/.config
 	make -C $(KERNEL_BUILD) -f $(JUNO_SCRIPTS)/aarch64_nfs.mak build
 
 menuconfig: $(KERNEL_BUILD)/.config
@@ -24,7 +24,7 @@ menuconfig: $(KERNEL_BUILD)/.config
 
 config: $(KERNEL_BUILD)/.config
 
-$(KERNEL_BUILD)/.config: rootfs
+$(KERNEL_BUILD)/.config:
 	@mkdir -p $(KERNEL_BUILD)
 	make -C $(KERNEL_SRC) -f  $(JUNO_SCRIPTS)/aarch64_nfs.mak config
 

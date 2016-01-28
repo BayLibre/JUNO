@@ -4,8 +4,7 @@
 CROSS_COMPILE	:= aarch64-linux-gnu-
 build_dir       := $(KERNEL_BUILD)
 output_dir	:= $(JUNO_HOME)/build
-rootfs		:= $(INSTALL_MOD_PATH)/rootfs.cpio
-rootfsbase	:= $(shell basename $(rootfs))
+rootfs		:= $(INSTALL_MOD_PATH)
 config_file     := $(build_dir)/.config
 makejobs	:= $(shell grep '^processor' /proc/cpuinfo | sort -u | wc -l)
 makethreads	:= $(shell dc -e "$(makejobs) 1 + p")
@@ -47,31 +46,12 @@ config-base: FORCE
 	--enable DEBUG_FS
 
 config-nfs: config-base FORCE
-	@cp $(rootfs) $(build_dir)/$(rootfsbase)
 	$(CURDIR)/scripts/config --file $(config_file) \
 	--enable ROOT_NFS \
 	--disable BLK_DEV_INITRD
 
-config-earlydebug: config-base FORCE
-	$(CURDIR)/scripts/config --file $(config_file) \
-	--enable DEBUG_KERNEL \
-	--enable DEBUG_LL \
-	--enable EARLY_PRINTK \
-	--set-str CMDLINE "earlyprintk"
-
-config-kasan: config-base FORCE
-	$(CURDIR)/scripts/config --file $(config_file) \
-	--enable KASAN \
-	--enable KASAN_OUTLINE \
-	--enable STACKTRACE \
-	--enable SLUB_DEBUG_ON \
-	--enable TEST_KASAN
-
 config: config-base config-nfs FORCE
 	yes "" | make $(make_options) oldconfig
-	$(CURDIR)/scripts/config --file $(config_file) \
-	--enable INPUT_KEYBOARD \
-	--enable KEYBOARD_GPIO
 
 menuconfig: FORCE
 	if [ ! -d $(build_dir) ] ; then \
