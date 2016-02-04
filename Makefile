@@ -53,8 +53,8 @@ rootfs.tar.xz: $(INSTALL_MOD_PATH)/.rootfs
 
 $(INSTALL_MOD_PATH)/.rootfs: $(JUNO_HOME)/buildroot/output/images/rootfs.tar
 	@mkdir -p $(INSTALL_MOD_PATH)
-	sudo tar xv -C $(INSTALL_MOD_PATH) -f $(JUNO_HOME)/buildroot/output/images/rootfs.tar
-	sudo chown ${USER}:${USER}  $(INSTALL_MOD_PATH)
+	fakeroot tar xv -C $(INSTALL_MOD_PATH) -f $(JUNO_HOME)/buildroot/output/images/rootfs.tar
+	fakeroot chown ${USER}:${USER}  $(INSTALL_MOD_PATH)
 	@date > $(INSTALL_MOD_PATH)/.rootfs
 
 $(JUNO_HOME)/buildroot/output/images/rootfs.tar: $(JUNO_HOME)/buildroot/.config
@@ -102,12 +102,12 @@ distclean: clean
 	make -C arm-trusted-firmware realclean
 	make -C buildroot clean
 	make -C u-boot mrproper
-	sudo rm -rf rootfs rootfs.tar.xz
+	fakeroot rm -rf rootfs rootfs.tar.xz
 	echo "" > .log
 
 clean:
 	-@rm -rf $(KERNEL_BUILD)
 	-@rm -rf $(UBOOT_BUILD)
-	-@sudo rm $(JUNO_HOME)/buildroot/output/images/rootfs.tar
+	-@fakeroot rm $(JUNO_HOME)/buildroot/output/images/rootfs.tar
 	-@rm $(INSTALL_MOD_PATH)/.rootfs
 
