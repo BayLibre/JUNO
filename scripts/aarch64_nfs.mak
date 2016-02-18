@@ -1,5 +1,5 @@
 
-## NFS VARIANT ## 
+## NFS VARIANT ##
 
 CROSS_COMPILE	:= aarch64-linux-gnu-
 build_dir       := $(KERNEL_BUILD)
@@ -43,7 +43,8 @@ config-base: FORCE
 	--enable MTD \
 	--enable MTD_CFI \
 	--enable MTD_AFS_PARTS \
-	--enable DEBUG_FS
+	--enable DEBUG_FS \
+	--enable HIBERNATION
 
 config-nfs: config-base FORCE
 	$(CURDIR)/scripts/config --file $(config_file) \
@@ -78,6 +79,8 @@ build-dtbs: FORCE
 
 build-zimage: have-crosscompiler FORCE
 	$(MAKE) $(make_options) Image CONFIG_DEBUG_SECTION_MISMATCH=y
+	$(MAKE) $(make_options) modules
+	fakeroot $(MAKE) $(make_options) modules_install
 
 build: have-crosscompiler build-dtbs build-zimage FORCE
 	@echo "Copy vmlinux to $(output_dir)/vmlinux"
@@ -109,6 +112,7 @@ build: have-crosscompiler build-dtbs build-zimage FORCE
 	fi
 	@echo "TFTP boot:"
 	@echo "set serverip $(serverip) ; set ipaddr 192.168.2.59 ; tftpboot 0x80000000 Image ; tftpboot 0x83000000 juno.dtb ; booti 0x80000000 - 0x83000000"
+
 
 clean:
 	$(MAKE) -f Makefile clean
