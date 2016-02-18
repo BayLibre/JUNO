@@ -12,31 +12,12 @@ tftproot	:= /var/lib/tftpboot
 
 serverip := $(SERVERIP)
 
-make_options := -f Makefile \
-		-j$(makethreads) -l$(makejobs) \
+make_options := -j$(makethreads) -l$(makejobs) \
 		ARCH=arm64 \
 		CROSS_COMPILE=$(CROSS_COMPILE) \
 		KBUILD_OUTPUT=$(build_dir)
 
-.PHONY: help
-help:
-	@echo "****  Common Makefile  ****"
-	@echo "make config - configure for aarch64"
-	@echo "make build - build the kernel with initramfs"
-
-.PHONY: have-crosscompiler
-have-crosscompiler:
-	@echo -n "Check that $(CROSS_COMPILE)gcc is available..."
-	@which $(CROSS_COMPILE)gcc > /dev/null ; \
-	if [ ! $$? -eq 0 ] ; then \
-	   echo "ERROR: cross-compiler $(CROSS_COMPILE)gcc not in PATH=$$PATH!" ; \
-	   echo "ABORTING." ; \
-	   exit 1 ; \
-	else \
-	   echo "OK" ;\
-	fi
-
-config-base: FORCE
+$(config_file): FORCE
 	@mkdir -p $(build_dir)
 	$(MAKE) $(make_options) defconfig
 	$(CURDIR)/scripts/config --file $(config_file) \
@@ -44,30 +25,17 @@ config-base: FORCE
 	--enable MTD_CFI \
 	--enable MTD_AFS_PARTS \
 	--enable DEBUG_FS \
-	--enable HIBERNATION
-
-config-nfs: config-base FORCE
-	$(CURDIR)/scripts/config --file $(config_file) \
+	--enable HIBERNATION \
 	--enable ROOT_NFS \
 	--disable BLK_DEV_INITRD
 
-config: config-base config-nfs FORCE
+config: $(config_file) FORCE
 	yes "" | make $(make_options) oldconfig
 
 menuconfig: FORCE
-	if [ ! -d $(build_dir) ] ; then \
-	   echo "no build dir" ; \
-	   exit 1 ; \
-        fi
-	$(MAKE) $(make_options) menuconfig
-	$(MAKE) $(make_options) savedefconfig
+	$(MAKE) -C $(build_dir) $(make_options) menuconfig
 
-saveconfig: FORCE
-	yes "" | make $(make_options) oldconfig
-	$(MAKE) $(make_options) savedefconfig
-	cp $(build_dir)/defconfig arch/arm64/configs/defconfig
-
-build-dtbs: FORCE
+dtbs: FORCE
 	$(MAKE) $(make_options) dtbs CONFIG_DEBUG_SECTION_MISMATCH=y
 	@echo "Copy Juno DTB to $(output_dir)/juno.dtb"
 	@cp -f $(build_dir)/arch/arm64/boot/dts/arm/juno.dtb $(output_dir)/juno.dtb
@@ -77,12 +45,16 @@ build-dtbs: FORCE
 	   cp -f $(build_dir)/arch/arm64/boot/dts/arm/juno.dtb $(tftproot) ; \
 	fi
 
-build-zimage: have-crosscompiler FORCE
+zimage:  FORCE
 	$(MAKE) $(make_options) Image CONFIG_DEBUG_SECTION_MISMATCH=y
 	$(MAKE) $(make_options) modules
 	fakeroot $(MAKE) $(make_options) modules_install
+	-rm -rf /tmp/my-modules
+	mkdir -p /tmp/my-modules
+	fakeroot $(MAKE) INSTALL_MOD_PATH=/tmp/my-modules $(make_options) modules_install
+	tar -C /tmp/my-modules  -cJvf $(JUNO_HOME)/build/modules.tar.xz lib
 
-build: have-crosscompiler build-dtbs build-zimage FORCE
+build:  dtbs zimage FORCE
 	@echo "Copy vmlinux to $(output_dir)/vmlinux"
 	@cp -f $(build_dir)/vmlinux $(output_dir)/vmlinux
 	@echo "Copy Image to $(output_dir)/Image"
@@ -115,7 +87,7 @@ build: have-crosscompiler build-dtbs build-zimage FORCE
 
 
 clean:
-	$(MAKE) -f Makefile clean
+	$(MAKE) clean
 	rm -rf $(build_dir)
 
 FORCE:
